@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: boots
+  name: boots
+  namespace: tink-system
+spec:
+  type: LoadBalancer
+  loadBalancerClass: kube-vip.io/kube-vip-class
+  loadBalancerIP: 192.168.2.113
+  externalTrafficPolicy: Local
+  ports:
+    - port: 80
+      name: boots-http
+      protocol: TCP
+    - port: 514
+      name: boots-syslog
+      protocol: UDP
+    - port: 67
+      name: boots-dhcp
+      protocol: UDP
+    - port: 69
+      name: boots-tftp
+      protocol: UDP
+  selector:
+    app: boots

@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tink-server
+spec:
+  replicas: 1
+  selector: { }
+  template:
+    metadata:
+      labels:
+        stack: tinkerbell
+    spec:
+      containers:
+        - args:
+            - --backend=kubernetes
+            - --tls=false
+          image: quay.io/tinkerbell/tink:v0.8.0
+          imagePullPolicy: IfNotPresent
+          name: server
+          ports:
+            - containerPort: 42113
+              name: tink-grpc
+          resources:
+            limits:
+              cpu: 500m
+              memory: 128Mi
+            requests:
+              cpu: 10m
+              memory: 64Mi
+      serviceAccountName: tink-server

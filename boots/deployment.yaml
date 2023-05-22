@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: boots
+  namespace: tink-system
+spec:
+  replicas: 1
+  selector: { }
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata: { }
+    spec:
+      containers:
+        - image: quay.io/tinkerbell/boots:v0.8.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - -dhcp-addr=0.0.0.0:67
+            - -ipxe-tftp-addr=0.0.0.0:69
+            - -http-addr=0.0.0.0:80
+            - -syslog-addr=0.0.0.0:514
+            - -osie-path-override=http://192.168.2.112:8080
+          env:
+            - name: TRUSTED_PROXIES
+              value: "10.244.0.0/24"
+            - name: DATA_MODEL_VERSION
+              value: "kubernetes"
+            - name: FACILITY_CODE
+              value: "lab1"
+            - name: MIRROR_BASE_URL
+              value: "http://192.168.2.112:8080"
+            - name: PUBLIC_IP
+              value: "192.168.2.113"
+            - name: PUBLIC_SYSLOG_FQDN
+              value: "192.168.2.113"
+            - name: TINKERBELL_GRPC_AUTHORITY
+              value: "192.168.2.112:42113"
+            - name: TINKERBELL_TLS
+              value: "false"
+            - name: BOOTS_EXTRA_KERNEL_ARGS
+              value: "tink_worker_image=quay.io/tinkerbell/tink-worker:v0.8.0"
+            - name: BOOTS_LOG_LEVEL
+              value: "info"
+          ports:
+            - containerPort: 80
+              name: boots-http
+              protocol: TCP
+            - containerPort: 514
+              name: boots-syslog
+              protocol: UDP
+            - containerPort: 67
+              name: boots-dhcp
+              protocol: UDP
+            - containerPort: 69
+              name: boots-tftp
+              protocol: UDP
+          name: boots
+          resources:
+            limits:
+              cpu: 500m
+              memory: 128Mi
+            requests:
+              cpu: 10m
+              memory: 64Mi
+      serviceAccountName: boots

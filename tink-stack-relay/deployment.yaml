@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tink-stack-relay
+spec:
+  selector: { }
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    spec:
+      containers:
+        - name: dhcp-relay
+          image: ghcr.io/jacobweinstock/dhcrelay
+          args: [ "-m", "append", "-c", "10", "-id", "macvlan54", "-iu", "eth0", "-U", "eth0", "boots.tink-system.svc.cluster.local." ]
+          resources:
+            limits:
+              cpu: 500m
+              memory: 128Mi
+            requests:
+              cpu: 10m
+              memory: 64Mi
+          securityContext:
+            capabilities:
+              add:
+                - NET_RAW
+      hostPID: true
+      initContainers:
+        - command:
+            - /bin/sh
+            - -c
+            - |
+              # This script allows us to listen and respond to DHCP requests on a host network interface and interact with Boots properly.
+              # This is used instead of `hostNetwork: true` because the dhcp relay requires clear paths for listening for broadcast traffic
+              # and sending/receiving unicast traffic to/from Boots.
+              set -xe
+              # Create a macvlan interface. TODO: If this fails, try again with a different name?
+              for interface in $(ifconfig | cut -d ' ' -f1| tr ':' '\n' | awk NF); do
+                {
+                  nsenter -t1 -n ip link add macvlan54 link "${interface}" type macvlan mode bridge
+                  break
+                } || {
+                  echo "Failing to create bridge with network interface ${interface}"
+                }
+              done
+              # Move the interface into the POD.
+              pid=$(echo $$)
+              nsenter -t1 -n ip link set macvlan54 netns ${pid} || nsenter -t1 -n ip link delete macvlan54
+              # Set the macvlan interface up
+              ip link set macvlan54 up
+              # Set the IP address
+              ip addr add 192.168.2.112/32 dev macvlan54 noprefixroute
+          image: alpine
+          name: macvlan-interface
+          securityContext:
+            privileged: true

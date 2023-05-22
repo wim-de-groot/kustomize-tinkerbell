@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: kube-vip
+spec:
+  selector: { }
+  template:
+    spec:
+      containers:
+        - args:
+            - manager
+          env:
+            - name: vip_arp
+              value: "true"
+            - name: svc_enable
+              value: "true"
+            - name: svc_election
+              value: "true"
+            - name: enableServicesElection
+              value: "true"
+          image: ghcr.io/kube-vip/kube-vip:v0.5.7
+          imagePullPolicy: IfNotPresent
+          name: kube-vip
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+                - NET_RAW
+      hostNetwork: true
+      serviceAccountName: kube-vip

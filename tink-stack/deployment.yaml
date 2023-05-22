@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tink-stack
+spec:
+  selector: { }
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: tink-stack
+          image: nginx:1.23.1
+          command: [ "/bin/bash", "-c" ]
+          args:
+            - export POD_NAMESERVER=$(awk 'NR==2 {print $2}' /etc/resolv.conf);
+              envsubst '$POD_NAMESERVER' < /tmp/nginx.conf.template > /etc/nginx/nginx.conf;
+              nginx -g 'daemon off;'
+          ports:
+            - containerPort: 50061
+              protocol: TCP
+              name: hegel-http
+            - containerPort: 42113
+              protocol: TCP
+              name: tink-grpc
+            - containerPort: 8080
+              protocol: TCP
+              name: hook-http
+          resources:
+            limits:
+              cpu: 500m
+              memory: 128Mi
+            requests:
+              cpu: 10m
+              memory: 64Mi
+          volumeMounts:
+            - mountPath: /usr/share/nginx/html
+              name: hook-artifacts
+            - mountPath: /tmp
+              readOnly: true
+              name: nginx-conf
+      initContainers:
+        - name: init-hook-download
+          image: ubuntu
+          command: [ "/bin/sh", "-xec" ]
+          # noinspection SpellCheckingInspection
+          args: # TODO(jacobweinstock): add checksum verification after download
+            - rm -rf /usr/share/nginx/html/checksums.txt;
+              touch /usr/share/nginx/html/checksums.txt;
+              echo "7c35042d35c003ae1f424e503ad6edf21854bc70b24b37006e810c3c8a92543420eed129c14e364769b0f32c27bdf4c61299fce8f8156af7477cac6a43931a20  vmlinuz-x86_64" >> /usr/share/nginx/html/checksums.txt;
+              echo "be7c3d57e2d73bfa4e41a2b5740c722b1c83722e4388b3cff9017192fce43ede360221e3095c800e511d7b4bce6065f2906883421409dd6d983412418a8d903e  initramfs-x86_64" >> /usr/share/nginx/html/checksums.txt;
+              echo "2f1bdbf64380e281288f54c6ddd29221d8a007d29b40f405da0592ed32ef6e52695fc5071e05b2db3f075122943d62a2c266704d154a16ffb7b278c70538e7da  vmlinuz-aarch64" >> /usr/share/nginx/html/checksums.txt;
+              echo "5adc51798c8699f5f257599aabb999e2c2f65a07c9f8607c65510e57122b3e5c53196819e7ececdcda7b8fef47ba597ea7c4b53f2f4a92e236b20e355443eefe  initramfs-aarch64" >> /usr/share/nginx/html/checksums.txt;
+              cd /usr/share/nginx/html/;
+              sha512sum -c checksums.txt && exit 0;
+              echo downloading HOOK...;
+              apt-get update && apt-get install -y wget;
+              wget -O /tmp/hook0.tar.gz https://github.com/tinkerbell/hook/releases/download/v0.7.0/hook_x86_64.tar.gz;
+              tar -zxvf /tmp/hook0.tar.gz -C "/usr/share/nginx/html/";
+              rm -rf /tmp/hook0.tar.gz;
+              echo downloading HOOK...;
+              apt-get update && apt-get install -y wget;
+              wget -O /tmp/hook1.tar.gz https://github.com/tinkerbell/hook/releases/download/v0.7.0/hook_aarch64.tar.gz;
+              tar -zxvf /tmp/hook1.tar.gz -C "/usr/share/nginx/html/";
+              rm -rf /tmp/hook1.tar.gz;
+          volumeMounts:
+            - mountPath: /usr/share/nginx/html
+              name: hook-artifacts
+      volumes:
+        - name: hook-artifacts
+          hostPath:
+            path: /opt/hook
+            type: DirectoryOrCreate
+        - name: nginx-conf
+          configMap:
+            name: nginx-conf
+            items:
+              - key: nginx.conf
+                path: nginx.conf.template

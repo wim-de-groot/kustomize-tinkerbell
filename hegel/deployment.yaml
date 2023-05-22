@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hegel
+spec:
+  replicas: 1
+  selector: { }
+  template:
+    spec:
+      containers:
+        - args:
+            - --backend=kubernetes
+            - --http-port=50061
+          env:
+            - name: HEGEL_TRUSTED_PROXIES
+              value: "10.244.0.0/24"
+          image: quay.io/tinkerbell/hegel:v0.10.1
+          imagePullPolicy: IfNotPresent
+          name: hegel
+          ports:
+            - containerPort: 50061
+              name: hegel-http
+          resources:
+            limits:
+              cpu: 500m
+              memory: 128Mi
+            requests:
+              cpu: 10m
+              memory: 64Mi
+      serviceAccountName: hegel
